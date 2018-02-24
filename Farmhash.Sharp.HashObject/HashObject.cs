@@ -137,7 +137,7 @@ namespace Farmhash.Sharp
                 var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(IConvertibleToBytesExpr, castedVariableExpr));
                 extractBytesExpr = Expression.Lambda(block, xInputParameter);
             }
-            else if (t.IsGenericType && typeof(IDictionary).IsAssignableFrom(t.GetGenericTypeDefinition()))
+            else if (typeof(IDictionary).IsAssignableFrom(t))
             {
                 var pExprKeys = Expression.Property(xInputParameter, "Keys");
                 var pExprValues = Expression.Property(xInputParameter, "Values");
