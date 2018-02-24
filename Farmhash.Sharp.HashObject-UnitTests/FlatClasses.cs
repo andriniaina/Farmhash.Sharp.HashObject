@@ -125,7 +125,7 @@ namespace Farmhash.Sharp.UnitTests
             var o = new MyClass3() { P1 = 3214, P3 = 563432167869876L, P4 = "hello world!" };
             for (int i = 0; i < 1000; i++)
             {
-                Assert.AreEqual(5800321734187549122UL, HashObject.GetHashNoCache(o));
+                Assert.AreEqual(5800321734187549122UL, HashObject.GetHashNoCache_forBenchmarks(o));
             }
         }
         [TestMethod]
@@ -134,7 +134,7 @@ namespace Farmhash.Sharp.UnitTests
             var o = new MyClass3() { P1 = 3214, P3 = 563432167869876L, P4 = "hello world!" };
             for (int i = 0; i < 10000; i++)
             {
-                Assert.AreEqual(5800321734187549122UL, HashObject.GetHashNoCache(o));
+                Assert.AreEqual(5800321734187549122UL, HashObject.GetHashNoCache_forBenchmarks(o));
             }
         }
     }

@@ -20,7 +20,7 @@ namespace Farmhash.Sharp
         {
         }
         */
-        static IDictionary<Type, List<Func<object, IEnumerable<byte>>>> functionCache = new Dictionary<Type, List<Func<object, IEnumerable<byte>>>>();
+        static Dictionary<Type, List<Func<object, IEnumerable<byte>>>> functionCache = new Dictionary<Type, List<Func<object, IEnumerable<byte>>>>();
         public static ulong Hash64<T>(T o)
         {
             List<Func<object, IEnumerable<byte>>> functions;
@@ -39,7 +39,7 @@ namespace Farmhash.Sharp
             return Farmhash.Hash64(bytes, bytes.Length);
         }
 
-        internal static ulong GetHashNoCache<T>(T o)
+        internal static ulong Hash64_NoCache_forBenchmarks<T>(T o)
         {
             IEnumerable<Func<object, IEnumerable<byte>>> functions;
             functions = BuildHashFunctions(typeof(T)).Select(f => f.Compile()).ToList();
