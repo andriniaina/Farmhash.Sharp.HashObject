@@ -24,6 +24,7 @@ namespace Farmhash.Sharp
                     if (!functionCache.TryGetValue(typeof(T), out functions))
                     {
                         functions = BuildHashFunctions(typeof(T)).Select(f => f.Compile()).ToList();
+                        if (functions.Count == 0) throw new NotSupportedException("no hash function found");
                         functionCache.Add(typeof(T), functions);
                     }
             }
@@ -44,63 +45,76 @@ namespace Farmhash.Sharp
         {
             var xExpr = Expression.Parameter(typeof(object), "x");
             var xExprCasted = Expression.Convert(xExpr, t);
-            ParameterExpression castedVariableExpr = Expression.Variable(t, "castedVariable");
+            var castedVariableExpr = Expression.Variable(t, "castedVariable");
             var assignement = Expression.Assign(castedVariableExpr, xExprCasted);
             foreach (var pInfo in t.GetProperties())
             {
-                var pExpr = Expression.Property(castedVariableExpr, pInfo);
+                Expression pExpr = Expression.Property(castedVariableExpr, pInfo);
                 LambdaExpression extractBytesExpr = null;
                 if (pInfo.PropertyType == typeof(bool))
                 {
-                    extractBytesExpr = GetExtractBytesExprForBool(pExpr);
+                    extractBytesExpr = BoolToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(byte))
                 {
-                    extractBytesExpr = GetExtractBytesExprForByte(pExpr);
+                    extractBytesExpr = ByteToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(sbyte))
                 {
-                    extractBytesExpr = GetExtractBytesExprForSByte(pExpr);
+                    extractBytesExpr = SByteToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(short))
                 {
-                    extractBytesExpr = GetExtractBytesExprForInt16(pExpr);
+                    extractBytesExpr = ShortToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(ushort))
                 {
-                    extractBytesExpr = GetExtractBytesExprForUInt16(pExpr);
+                    extractBytesExpr = UShortToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(int))
                 {
-                    extractBytesExpr = GetExtractBytesExprForInt32(pExpr);
+                    extractBytesExpr = Int32ToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(uint))
                 {
-                    extractBytesExpr = GetExtractBytesExprForUInt32(pExpr);
+                    extractBytesExpr = UInt32ToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(long))
                 {
-                    extractBytesExpr = GetExtractBytesExprForInt64(pExpr);
+                    extractBytesExpr = Int64ToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(ulong))
                 {
-                    extractBytesExpr = GetExtractBytesExprForUInt64(pExpr);
+                    extractBytesExpr = UInt64ToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(float))
                 {
-                    extractBytesExpr = GetExtractBytesExprForSingle(pExpr);
+                    extractBytesExpr = FloatToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(double))
                 {
-                    extractBytesExpr = GetExtractBytesExprForDouble(pExpr);
+                    extractBytesExpr = DoubleToBytesExpr;
+                }
+                else if (pInfo.PropertyType == typeof(decimal))
+                {
+                    extractBytesExpr = DecimalToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(char))
                 {
-                    extractBytesExpr = GetExtractBytesExprForChar(pExpr);
+                    extractBytesExpr = CharToBytesExpr;
                 }
                 else if (pInfo.PropertyType == typeof(string))
                 {
-                    extractBytesExpr = GetExtractBytesExprForStringUtf8(pExpr);
+                    extractBytesExpr = StringToBytesExpr;
+                }
+                else if (pInfo.PropertyType == typeof(DateTime))
+                {
+                    extractBytesExpr = DateTimeToBytesExpr;
+                }
+                else if (pInfo.PropertyType.IsEnum)
+                {
+                    pExpr = Expression.Convert(pExpr, typeof(IConvertible));
+                    extractBytesExpr = IConvertibleToBytesExpr;
                 }
                 else if (typeof(object).IsAssignableFrom(pInfo.PropertyType))
                 {
@@ -118,7 +132,7 @@ namespace Farmhash.Sharp
                 }
                 else
                 {
-                    throw new NotImplementedException();
+                    throw new NotImplementedException($"type {pInfo.PropertyType} is not supported");
                 }
                 var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(extractBytesExpr, pExpr));
                 var xx = Expression.Lambda<Func<object, IEnumerable<byte>>>(block, xExpr);
@@ -127,70 +141,29 @@ namespace Farmhash.Sharp
             // throw new NotImplementedException();
         }
 
-        private static LambdaExpression GetExtractBytesExprForBool(MemberExpression pExpr)
+
+        private static IEnumerable<byte> GetDecimalBytes(decimal d)
         {
-            Expression<Func<bool, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
+            foreach (var i in Decimal.GetBits(d))
+                foreach (var b in BitConverter.GetBytes(i))
+                    yield return b;
         }
-        private static LambdaExpression GetExtractBytesExprForByte(MemberExpression pExpr)
-        {
-            Expression<Func<byte, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForSByte(MemberExpression pExpr)
-        {
-            Expression<Func<sbyte, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForInt16(MemberExpression pExpr)
-        {
-            Expression<Func<short, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForUInt16(MemberExpression pExpr)
-        {
-            Expression<Func<ushort, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForInt32(MemberExpression pExpr)
-        {
-            Expression<Func<int, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForUInt32(MemberExpression pExpr)
-        {
-            Expression<Func<uint, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForInt64(MemberExpression pExpr)
-        {
-            Expression<Func<long, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForUInt64(MemberExpression pExpr)
-        {
-            Expression<Func<ulong, IEnumerable<byte>>> byteExtractor = i => BitConverter.GetBytes(i);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForChar(MemberExpression pExpr)
-        {
-            Expression<Func<char, IEnumerable<byte>>> byteExtractor = c => BitConverter.GetBytes(c);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForDouble(MemberExpression pExpr)
-        {
-            Expression<Func<double, IEnumerable<byte>>> byteExtractor = s => BitConverter.GetBytes(s);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForSingle(MemberExpression pExpr)
-        {
-            Expression<Func<float, IEnumerable<byte>>> byteExtractor = s => BitConverter.GetBytes(s);
-            return byteExtractor;
-        }
-        private static LambdaExpression GetExtractBytesExprForStringUtf8(MemberExpression pExpr)
-        {
-            Expression<Func<string, IEnumerable<byte>>> byteExtractor = s => Encoding.UTF8.GetBytes(s);
-            return byteExtractor;
-        }
+
+        static readonly Expression<Func<DateTime, IEnumerable<byte>>> DateTimeToBytesExpr = i => BitConverter.GetBytes(i.Ticks);
+        static readonly Expression<Func<IConvertible, IEnumerable<byte>>> IConvertibleToBytesExpr = i => BitConverter.GetBytes(Convert.ToInt64(i));
+        static readonly Expression<Func<bool, IEnumerable<byte>>> BoolToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<byte, IEnumerable<byte>>> ByteToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<sbyte, IEnumerable<byte>>> SByteToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<short, IEnumerable<byte>>> ShortToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<ushort, IEnumerable<byte>>> UShortToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<int, IEnumerable<byte>>> Int32ToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<uint, IEnumerable<byte>>> UInt32ToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<long, IEnumerable<byte>>> Int64ToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<ulong, IEnumerable<byte>>> UInt64ToBytesExpr = i => BitConverter.GetBytes(i);
+        static readonly Expression<Func<char, IEnumerable<byte>>> CharToBytesExpr = c => BitConverter.GetBytes(c);
+        static readonly Expression<Func<double, IEnumerable<byte>>> DoubleToBytesExpr = s => BitConverter.GetBytes(s);
+        static readonly Expression<Func<decimal, IEnumerable<byte>>> DecimalToBytesExpr = d => GetDecimalBytes(d);
+        static readonly Expression<Func<float, IEnumerable<byte>>> FloatToBytesExpr = s => BitConverter.GetBytes(s);
+        static readonly Expression<Func<string, IEnumerable<byte>>> StringToBytesExpr = s => Encoding.UTF8.GetBytes(s);
     }
 }
