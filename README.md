@@ -1,5 +1,5 @@
 
-(experimental)
+hash an object multiple times superfast without doing reflection each time (experimental)
 
 # Farmhash.Sharp.HashObject
 High performance generic memberwise GetHashCode() :
