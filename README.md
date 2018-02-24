@@ -1,7 +1,7 @@
 
 
 # Farmhash.Sharp.HashObject
-High performance generic GetHashCode(), like Farmhash.Sharp but also works with objects! (experimental)
+High performance generic memberwise GetHashCode(); internally uses Farmhash.Sharp (experimental)
 
 Internally uses a cache of expression tree => the Reflection is done only once per type => a magnitude times faster than using reflection
 
