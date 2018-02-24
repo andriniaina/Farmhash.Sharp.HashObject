@@ -154,8 +154,8 @@ namespace Farmhash.Sharp
 
                     var f = GetIEnumerableToBytes(converter);
                     yield return f;
-                    yield break;
                 }
+                    yield break;
             }
             else if (typeof(object).IsAssignableFrom(t))
             {
