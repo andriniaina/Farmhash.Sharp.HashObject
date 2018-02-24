@@ -5,6 +5,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -29,7 +30,7 @@ namespace Farmhash.Sharp
                 lock (functionCache)
                     if (!functionCache.TryGetValue(typeof(T), out functions))
                     {
-                        functions = BuildHashFunctions(typeof(T)).Select(f => f.Compile()).ToList();
+                        functions = BuildHashFunctionsWrapped<T>(typeof(T)).Select(f => f.Compile()).ToList();
                         if (functions.Count == 0) throw new NotSupportedException("no hash function found");
                         functionCache.Add(typeof(T), functions);
                     }
@@ -42,111 +43,160 @@ namespace Farmhash.Sharp
         internal static ulong Hash64_NoCache_forBenchmarks<T>(T o)
         {
             IEnumerable<Func<object, IEnumerable<byte>>> functions;
-            functions = BuildHashFunctions(typeof(T)).Select(f => f.Compile()).ToList();
+            functions = BuildHashFunctionsWrapped<T>(typeof(T)).Select(f => f.Compile()).ToList();
             var bytes = functions.SelectMany(f => f(o)).ToArray();
             return Farmhash.Hash64(bytes, bytes.Length);
         }
 
-        private static IEnumerable<Expression<Func<object, IEnumerable<byte>>>> BuildHashFunctions(Type t)
+        private static IEnumerable<Expression<Func<object, IEnumerable<byte>>>> BuildHashFunctionsWrapped<T>(Type t)
         {
             var xExpr = Expression.Parameter(typeof(object), "x");
             var xExprCasted = Expression.Convert(xExpr, t);
             var castedVariableExpr = Expression.Variable(t, "castedVariable");
             var assignement = Expression.Assign(castedVariableExpr, xExprCasted);
-            foreach (var pInfo in t.GetProperties())
+
+            foreach (var expr in BuildHashLambdas(t))
             {
-                Expression pExpr = Expression.Property(castedVariableExpr, pInfo);
-                LambdaExpression extractBytesExpr = null;
-                if (pInfo.PropertyType == typeof(bool))
-                {
-                    extractBytesExpr = BoolToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(byte))
-                {
-                    extractBytesExpr = ByteToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(sbyte))
-                {
-                    extractBytesExpr = SByteToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(short))
-                {
-                    extractBytesExpr = ShortToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(ushort))
-                {
-                    extractBytesExpr = UShortToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(int))
-                {
-                    extractBytesExpr = Int32ToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(uint))
-                {
-                    extractBytesExpr = UInt32ToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(long))
-                {
-                    extractBytesExpr = Int64ToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(ulong))
-                {
-                    extractBytesExpr = UInt64ToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(float))
-                {
-                    extractBytesExpr = FloatToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(double))
-                {
-                    extractBytesExpr = DoubleToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(decimal))
-                {
-                    extractBytesExpr = DecimalToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(char))
-                {
-                    extractBytesExpr = CharToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(string))
-                {
-                    extractBytesExpr = StringToBytesExpr;
-                }
-                else if (pInfo.PropertyType == typeof(DateTime))
-                {
-                    extractBytesExpr = DateTimeToBytesExpr;
-                }
-                else if (pInfo.PropertyType.IsEnum)
-                {
-                    pExpr = Expression.Convert(pExpr, typeof(IConvertible));
-                    extractBytesExpr = IConvertibleToBytesExpr;
-                }
-                else if (typeof(object).IsAssignableFrom(pInfo.PropertyType))
-                {
-                    var subexpr = BuildHashFunctions(pInfo.PropertyType);
-                    foreach (var e in subexpr)
-                    {
-                        var xxExpr = Expression.Parameter(typeof(object), "thisGonBeGud");
-                        var xxExprCasted = Expression.Convert(xxExpr, t);
-                        var trololol = Expression.Property(xxExprCasted, pInfo);
-                        var itwoooooooorkkkkss = Expression.Invoke(e, trololol);
-                        var xxxxx = Expression.Lambda<Func<object, IEnumerable<byte>>>(itwoooooooorkkkkss, xxExpr);
-                        yield return xxxxx;
-                    }
-                    continue;
-                }
-                else
-                {
-                    throw new NotImplementedException($"type {pInfo.PropertyType} is not supported");
-                }
-                var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(extractBytesExpr, pExpr));
+                var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(expr, castedVariableExpr));
+                //var sdf = Expression.Invoke(block, xExpr);
                 var xx = Expression.Lambda<Func<object, IEnumerable<byte>>>(block, xExpr);
                 yield return xx;
             }
-            // throw new NotImplementedException();
+        }
+        private static IEnumerable<LambdaExpression> BuildHashLambdas(Type t)
+        {
+            var xInputParameter = Expression.Parameter(t, "input");
+
+            LambdaExpression extractBytesExpr = null;
+            if (t == typeof(bool))
+            {
+                extractBytesExpr = BoolToBytesExpr;
+            }
+            else if (t == typeof(byte))
+            {
+                extractBytesExpr = ByteToBytesExpr;
+            }
+            else if (t == typeof(sbyte))
+            {
+                extractBytesExpr = SByteToBytesExpr;
+            }
+            else if (t == typeof(short))
+            {
+                extractBytesExpr = ShortToBytesExpr;
+            }
+            else if (t == typeof(ushort))
+            {
+                extractBytesExpr = UShortToBytesExpr;
+            }
+            else if (t == typeof(int))
+            {
+                extractBytesExpr = Int32ToBytesExpr;
+            }
+            else if (t == typeof(uint))
+            {
+                extractBytesExpr = UInt32ToBytesExpr;
+            }
+            else if (t == typeof(long))
+            {
+                extractBytesExpr = Int64ToBytesExpr;
+            }
+            else if (t == typeof(ulong))
+            {
+                extractBytesExpr = UInt64ToBytesExpr;
+            }
+            else if (t == typeof(float))
+            {
+                extractBytesExpr = FloatToBytesExpr;
+            }
+            else if (t == typeof(double))
+            {
+                extractBytesExpr = DoubleToBytesExpr;
+            }
+            else if (t == typeof(decimal))
+            {
+                extractBytesExpr = DecimalToBytesExpr;
+            }
+            else if (t == typeof(char))
+            {
+                extractBytesExpr = CharToBytesExpr;
+            }
+            else if (t == typeof(string))
+            {
+                extractBytesExpr = StringToBytesExpr;
+            }
+            else if (t == typeof(DateTime))
+            {
+                extractBytesExpr = DateTimeToBytesExpr;
+            }
+            else if (t.IsEnum)
+            {
+                var xExprCasted = Expression.Convert(xInputParameter, typeof(IConvertible));
+                var castedVariableExpr = Expression.Variable(typeof(IConvertible), "castedVariable");
+                var assignement = Expression.Assign(castedVariableExpr, xExprCasted);
+
+                var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(IConvertibleToBytesExpr, castedVariableExpr));
+                extractBytesExpr = Expression.Lambda(block, xInputParameter);
+            }
+            else if (t.IsGenericType && typeof(IEnumerable).IsAssignableFrom(t.GetGenericTypeDefinition()))
+            {
+                Type underlyingType = t.GetGenericArguments()[0];
+                var subexpr = BuildHashLambdas(underlyingType);
+                foreach (var e in subexpr)
+                {
+                    var pBoxedUnderlyingObject = Expression.Parameter(typeof(object), "boxedUnderlyingObject");
+                    var xExprCasted = Expression.Convert(pBoxedUnderlyingObject, underlyingType);
+                    var castedVariableExpr = Expression.Variable(underlyingType, "castedVariable");
+                    var assignement = Expression.Assign(castedVariableExpr, xExprCasted);
+                    var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(e, castedVariableExpr));
+                    var xxxxx = Expression.Lambda<Func<object, IEnumerable<byte>>>(block, pBoxedUnderlyingObject);
+
+                    var converter = xxxxx.Compile();
+
+                    var f = GetIEnumerableToBytes(converter);
+                    yield return f;
+                    yield break;
+                }
+            }
+            else if (typeof(object).IsAssignableFrom(t))
+            {
+                foreach (var pInfo in t.GetProperties())
+                {
+                    Expression pExpr = Expression.Property(xInputParameter, pInfo);
+
+                    var subexpr = BuildHashLambdas(pInfo.PropertyType);
+                    foreach (var e in subexpr)
+                    {
+                        var xxInputParameter = Expression.Parameter(t, "xx");
+                        var xxxxx = Expression.Lambda(Expression.Invoke(e, pExpr), xInputParameter);
+                        yield return xxxxx;
+                    }
+                }
+                yield break;
+            }
+            else
+            {
+                throw new NotImplementedException($"type {t} is not supported");
+            }
+            // var xx = Expression.Lambda(Expression.Invoke(extractBytesExpr, xInputParameter), xInputParameter);
+            yield return extractBytesExpr;
+        }
+        
+        private static Expression<Func<IEnumerable, IEnumerable<byte>>> GetIEnumerableToBytes(Func<object, IEnumerable<byte>> converter)
+        {
+            Expression<Func<System.Collections.IEnumerable, IEnumerable<byte>>> expr = d => GetBytes(d, converter);
+            return expr;
         }
 
+        private static IEnumerable<byte> GetBytes(IEnumerable d, Func<object, IEnumerable<byte>> f)
+        {
+            foreach (var item in d)
+            {
+                foreach (var b in f(item))
+                {
+                    yield return b;
+                }
+            }
+        }
 
         private static IEnumerable<byte> GetDecimalBytes(decimal d)
         {

@@ -19,6 +19,7 @@ High performance generic memberwise GetHashCode() :
 Supports :
 * all primitive types
 * Objects and nested objects (except circular references)
+* IEnumerables
 * enums
 
 Performance on my machine (Athlon X4-860k)

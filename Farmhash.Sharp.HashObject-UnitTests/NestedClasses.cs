@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Farmhash.Sharp;
+using System.Collections.Generic;
 
 namespace Farmhash.Sharp.UnitTests
 {
@@ -17,6 +18,10 @@ namespace Farmhash.Sharp.UnitTests
             public int P1 { get; set; }
             public MySubClass P2 { get; set; }
         }
+        class MyClassWithList
+        {
+            public IList<int> P1 { get; set; } = new List<int> { 1, 27, 35, 41, 56 };
+        }
 
         [TestMethod]
         public void VerifyNestedClassesBasic()
@@ -32,6 +37,12 @@ namespace Farmhash.Sharp.UnitTests
             var h2 = HashObject.Hash64(new { P1 = 123, P2 = new { SP1 = 654 } });
 
             Assert.AreEqual(h1, h2);
+        }
+
+        [TestMethod]
+        public void VerifyNestedClassWithList()
+        {
+            Assert.AreEqual(HashObject.Hash64(new { P1=1,P27=27,P35=35,P41=41,P56=56 }), HashObject.Hash64(new MyClassWithList()));
         }
     }
 }
