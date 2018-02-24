@@ -48,5 +48,10 @@ namespace Farmhash.Sharp.UnitTests
             Assert.AreEqual(HashObject.Hash64(new { P1 = new MyClassWithList().P1, P2 = new MyClassWithList().P1, P3 = new MyClassWithList().P1 }), HashObject.Hash64(new { P1 = new List<MyClassWithList>() { new MyClassWithList(), new MyClassWithList(), new MyClassWithList() } }));
             Assert.AreEqual(HashObject.Hash64(new { P1 = new List<IList<int>> { new MyClassWithList().P1, new MyClassWithList().P1, new MyClassWithList().P1 } }), HashObject.Hash64(new { P1 = new List<MyClassWithList>() { new MyClassWithList(), new MyClassWithList(), new MyClassWithList() } }));
         }
+        [TestMethod]
+        public void VerifyDictionary()
+        {
+            Assert.AreEqual(HashObject.Hash64(new { P1 = 1, P35 = 35, P27 = 27, P41 = 41 }), HashObject.Hash64(new Dictionary<int, int> { { 1, 27 }, { 35, 41 } }));
+        }
     }
 }

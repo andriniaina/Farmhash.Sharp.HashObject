@@ -137,6 +137,23 @@ namespace Farmhash.Sharp
                 var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(IConvertibleToBytesExpr, castedVariableExpr));
                 extractBytesExpr = Expression.Lambda(block, xInputParameter);
             }
+            else if (t.IsGenericType && typeof(IDictionary).IsAssignableFrom(t.GetGenericTypeDefinition()))
+            {
+                var pExprKeys = Expression.Property(xInputParameter, "Keys");
+                var pExprValues = Expression.Property(xInputParameter, "Values");
+
+                var subexprKeys = BuildHashLambdas(t.GetProperty("Keys").PropertyType);
+                foreach (var e in subexprKeys)
+                {
+                    yield return Expression.Lambda(Expression.Invoke(e, pExprKeys), xInputParameter);
+                }
+                var subexprValues = BuildHashLambdas(t.GetProperty("Values").PropertyType);
+                foreach (var e in subexprValues)
+                {
+                    yield return Expression.Lambda(Expression.Invoke(e, pExprValues), xInputParameter);
+                }
+                yield break;//                throw new NotImplementedException();
+            }
             else if (t.IsGenericType && typeof(IEnumerable).IsAssignableFrom(t.GetGenericTypeDefinition()))
             {
                 Type underlyingType = t.GetGenericArguments()[0];
@@ -155,7 +172,7 @@ namespace Farmhash.Sharp
                     var f = GetIEnumerableToBytes(converter);
                     yield return f;
                 }
-                    yield break;
+                yield break;
             }
             else if (typeof(object).IsAssignableFrom(t))
             {
@@ -180,7 +197,7 @@ namespace Farmhash.Sharp
             // var xx = Expression.Lambda(Expression.Invoke(extractBytesExpr, xInputParameter), xInputParameter);
             yield return extractBytesExpr;
         }
-        
+
         private static Expression<Func<IEnumerable, IEnumerable<byte>>> GetIEnumerableToBytes(Func<object, IEnumerable<byte>> converter)
         {
             Expression<Func<System.Collections.IEnumerable, IEnumerable<byte>>> expr = d => GetBytes(d, converter);
