@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Farmhash.Sharp;
+using System.Linq;
 
 namespace Farmhash.Sharp.UnitTests
 {
@@ -69,6 +70,17 @@ namespace Farmhash.Sharp.UnitTests
             {
                 Assert.AreEqual(5800321734187549122UL, HashObject.Hash64(o));
             }
+        }
+        [TestMethod]
+        public void Perf10000_threadsafety()
+        {
+            var passed = Enumerable.Range(0, 10000)
+                .AsParallel()
+                .Select(i => new MyClass3() { P1 = 3214, P3 = 563432167869876L, P4 = "hello world!" })
+                .All(o => HashObject.Hash64(o) == 5800321734187549122UL)
+                ;
+
+            Assert.IsTrue(passed);
         }
         [TestMethod]
         public void Perf1000_nocache()
