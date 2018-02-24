@@ -46,6 +46,7 @@ namespace Farmhash.Sharp.UnitTests
             Assert.AreEqual(HashObject.Hash64(new { P1 = 1, P27 = 27, P35 = 35, P41 = 41, P56 = 56 }), HashObject.Hash64(new { P1 = new List<int> { 1, 27 }, P2 = new { P3 = new List<int> { 35 }, P41 = 41, P56 = 56 } }));
             Assert.AreEqual(HashObject.Hash64(new { P1 = 1, P27 = 27, P35 = 35, P41 = 41, P56 = 56 }), HashObject.Hash64(new { P1 = new List<MyClassWithList>() { new MyClassWithList() } }));
             Assert.AreEqual(HashObject.Hash64(new { P1 = new MyClassWithList().P1, P2 = new MyClassWithList().P1, P3 = new MyClassWithList().P1 }), HashObject.Hash64(new { P1 = new List<MyClassWithList>() { new MyClassWithList(), new MyClassWithList(), new MyClassWithList() } }));
+            Assert.AreEqual(HashObject.Hash64(new { P1 = new List<IList<int>> { new MyClassWithList().P1, new MyClassWithList().P1, new MyClassWithList().P1 } }), HashObject.Hash64(new { P1 = new List<MyClassWithList>() { new MyClassWithList(), new MyClassWithList(), new MyClassWithList() } }));
         }
     }
 }
