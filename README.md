@@ -16,6 +16,8 @@ High performance generic memberwise GetHashCode() :
 * internally uses Farmhash.Sharp for a superfast hashing function
 * maintains a cache of expression tree => the Reflection is done only once per type => a magnitude times faster than using reflection
 
+This library could have been written using functional programming an yielding debuggable dynamically built functions, but i am convinced that using Expression trees gives the greatest performance and avoids unnecessary type casts.
+
 Supports :
 * all primitive types
 * Objects and nested objects (except circular references)
