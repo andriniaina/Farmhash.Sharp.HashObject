@@ -22,7 +22,7 @@ Supports :
 * all primitive types
 * Objects and nested objects (except circular references)
 * IEnumerable<>
-* IDictionary and IDictionary<>
+* IDictionary<>
 * enums
 
 Performance on my machine (Athlon X4-860k)
