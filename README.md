@@ -26,7 +26,6 @@ Supports :
 * enums
 
 Todo:
-* check null values
 * expose a predicate to filter properties (eg. public properties only, or a filter by name)
 * plugin architecture to handle more custom types
 
@@ -36,6 +35,6 @@ Performance on my machine (Athlon X4-860k)
 | object count | time with expression tree cache | no cache                  |
 |--------------|---------------------------------|---------------------------|
 | 1            | **<1ms**                        | <1ms                      |
-| 1000         | **1ms**                         | 601ms                     |
-| 10000        | **14ms**                        | >6000ms (**425x slower**) |
+| 1000         | **1ms**                         | 800ms                     |
+| 10000        | **16ms**                        | ~8000ms (**500x slower**) |
 

@@ -58,7 +58,6 @@ namespace Farmhash.Sharp
             foreach (var expr in BuildHashLambdas(t))
             {
                 var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(expr, castedVariableExpr));
-                //var sdf = Expression.Invoke(block, xExpr);
                 var xx = Expression.Lambda<Func<object, IEnumerable<byte>>>(block, xExpr);
                 yield return xx;
             }
@@ -183,9 +182,16 @@ namespace Farmhash.Sharp
                     var subexpr = BuildHashLambdas(pInfo.PropertyType);
                     foreach (var e in subexpr)
                     {
+                        /*
                         var xxInputParameter = Expression.Parameter(t, "xx");
                         var xxxxx = Expression.Lambda(Expression.Invoke(e, pExpr), xInputParameter);
                         yield return xxxxx;
+                        */
+                        var xxInputParameter = Expression.Parameter(t, "xx");
+                        var ifNotNull = Expression.Invoke(e, pExpr);
+                        var ifNull = Expression.Constant(new byte[0], typeof(IEnumerable<byte>));
+                        var xxxxx = Expression.Condition(Expression.Equal(xInputParameter, NULL), ifNull, ifNotNull);
+                        yield return Expression.Lambda(xxxxx, xInputParameter);
                     }
                 }
                 yield break;
@@ -194,7 +200,6 @@ namespace Farmhash.Sharp
             {
                 throw new NotImplementedException($"type {t} is not supported");
             }
-            // var xx = Expression.Lambda(Expression.Invoke(extractBytesExpr, xInputParameter), xInputParameter);
             yield return extractBytesExpr;
         }
 
@@ -222,6 +227,7 @@ namespace Farmhash.Sharp
                     yield return b;
         }
 
+        static readonly ConstantExpression NULL = Expression.Constant(null, typeof(object));
         static readonly Expression<Func<DateTime, IEnumerable<byte>>> DateTimeToBytesExpr = i => BitConverter.GetBytes(i.Ticks);
         static readonly Expression<Func<IConvertible, IEnumerable<byte>>> IConvertibleToBytesExpr = i => BitConverter.GetBytes(Convert.ToInt64(i));
         static readonly Expression<Func<bool, IEnumerable<byte>>> BoolToBytesExpr = i => BitConverter.GetBytes(i);
@@ -237,6 +243,6 @@ namespace Farmhash.Sharp
         static readonly Expression<Func<double, IEnumerable<byte>>> DoubleToBytesExpr = s => BitConverter.GetBytes(s);
         static readonly Expression<Func<decimal, IEnumerable<byte>>> DecimalToBytesExpr = d => GetDecimalBytes(d);
         static readonly Expression<Func<float, IEnumerable<byte>>> FloatToBytesExpr = s => BitConverter.GetBytes(s);
-        static readonly Expression<Func<string, IEnumerable<byte>>> StringToBytesExpr = s => Encoding.UTF8.GetBytes(s);
+        static readonly Expression<Func<string, IEnumerable<byte>>> StringToBytesExpr = s => s == null ? new byte[0] : Encoding.UTF8.GetBytes(s);
     }
 }

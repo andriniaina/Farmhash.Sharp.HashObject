@@ -63,6 +63,9 @@ namespace Farmhash.Sharp.UnitTests
         [TestMethod]
         public void Verify()
         {
+            Assert.AreEqual(11160318154034397263UL, HashObject.Hash64(new { P1 = (string)null }));
+            Assert.AreEqual(11160318154034397263UL, HashObject.Hash64(new { P1 = (MyClass4)null }));
+
             Assert.AreEqual(5161771770385946686UL, HashObject.Hash64(new { P1 = true }));
             Assert.AreEqual(6831060280857550628UL, HashObject.Hash64(new { P1 = (byte)5 }));
             Assert.AreEqual(6635462465573064060UL, HashObject.Hash64(new { P1 = (sbyte)-5 }));
