@@ -21,7 +21,8 @@ This library could have been written using functional programming an yielding de
 Supports :
 * all primitive types
 * Objects and nested objects (except circular references)
-* IEnumerables
+* IEnumerable<>
+* IDictionary and IDictionary<>
 * enums
 
 Performance on my machine (Athlon X4-860k)
