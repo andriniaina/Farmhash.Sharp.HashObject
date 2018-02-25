@@ -25,6 +25,11 @@ Supports :
 * IDictionary<>
 * enums
 
+Todo:
+* check null values
+* expose a predicate to filter properties (eg. public properties only, or a filter by name)
+* plugin architecture to handle more custom types
+
 Performance on my machine (Athlon X4-860k)
 ======
 
