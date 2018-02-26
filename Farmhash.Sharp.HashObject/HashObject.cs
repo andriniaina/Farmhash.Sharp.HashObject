@@ -9,6 +9,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -21,48 +22,77 @@ namespace Farmhash.Sharp
         {
         }
         */
-        static Dictionary<Type, List<Func<object, IEnumerable<byte>>>> functionCache = new Dictionary<Type, List<Func<object, IEnumerable<byte>>>>();
+        static Func<System.Reflection.PropertyInfo, bool> ACCEPT_ALL = p => true;
+        static Dictionary<Tuple<Type, int>, List<Func<object, IEnumerable<byte>>>> functionCache = new Dictionary<Tuple<Type, int>, List<Func<object, IEnumerable<byte>>>>();
         public static ulong Hash64<T>(T o)
         {
+            return Hash64(o, ACCEPT_ALL);
+        }
+        public static ulong Hash64<T>(T o, Func<System.Reflection.PropertyInfo, bool> propertyFilter)
+        {
+            List<Func<object, IEnumerable<byte>>> functions = GetCachedCompiledHashFunctions<T>(propertyFilter);
+            var bytes = functions.SelectMany(f => f(o)).ToArray();
+            return Farmhash.Hash64(bytes, bytes.Length);
+        }
+
+        public static uint Hash32<T>(T o, Func<System.Reflection.PropertyInfo, bool> propertyFilter)
+        {
+            List<Func<object, IEnumerable<byte>>> functions = GetCachedCompiledHashFunctions<T>(propertyFilter);
+            var bytes = functions.SelectMany(f => f(o)).ToArray();
+            return Farmhash.Hash32(bytes, bytes.Length);
+        }
+
+        public static int HashS32<T>(T o, Func<System.Reflection.PropertyInfo, bool> propertyFilter)
+        {
+            List<Func<object, IEnumerable<byte>>> functions = GetCachedCompiledHashFunctions<T>(propertyFilter);
+            var bytes = functions.SelectMany(f => f(o)).ToArray();
+            var uhash = Farmhash.Hash32(bytes, bytes.Length);
+            var hash = BitConverter.ToInt32(BitConverter.GetBytes(uhash), 0);
+            return hash;
+        }
+
+        private static List<Func<object, IEnumerable<byte>>> GetCachedCompiledHashFunctions<T>(Func<System.Reflection.PropertyInfo, bool> propertyFilter)
+        {
+            var cacheKey = Tuple.Create(typeof(T), propertyFilter.GetHashCode());
             List<Func<object, IEnumerable<byte>>> functions;
-            if (!functionCache.TryGetValue(typeof(T), out functions))
+            if (!functionCache.TryGetValue(cacheKey, out functions))
             {
                 lock (functionCache)
-                    if (!functionCache.TryGetValue(typeof(T), out functions))
+                    if (!functionCache.TryGetValue(cacheKey, out functions))
                     {
-                        functions = BuildHashFunctionsWrapped<T>(typeof(T)).Select(f => f.Compile()).ToList();
+                        functions = BuildHashFunctionsWrapped<T>(propertyFilter).Select(f => f.Compile()).ToList();
                         if (functions.Count == 0) throw new NotSupportedException("no hash function found");
-                        functionCache.Add(typeof(T), functions);
+                        functionCache.Add(cacheKey, functions);
                     }
             }
 
-            var bytes = functions.SelectMany(f => f(o)).ToArray();
-            return Farmhash.Hash64(bytes, bytes.Length);
+            return functions;
         }
 
         internal static ulong Hash64_NoCache_forBenchmarks<T>(T o)
         {
             IEnumerable<Func<object, IEnumerable<byte>>> functions;
-            functions = BuildHashFunctionsWrapped<T>(typeof(T)).Select(f => f.Compile()).ToList();
+            functions = BuildHashFunctionsWrapped<T>(ACCEPT_ALL).Select(f => f.Compile()).ToList();
             var bytes = functions.SelectMany(f => f(o)).ToArray();
             return Farmhash.Hash64(bytes, bytes.Length);
         }
 
-        private static IEnumerable<Expression<Func<object, IEnumerable<byte>>>> BuildHashFunctionsWrapped<T>(Type t)
+        private static IEnumerable<Expression<Func<object, IEnumerable<byte>>>> BuildHashFunctionsWrapped<T>(Func<System.Reflection.PropertyInfo, bool> propertyFilter)
         {
+            var t = typeof(T);
             var xExpr = Expression.Parameter(typeof(object), "x");
             var xExprCasted = Expression.Convert(xExpr, t);
             var castedVariableExpr = Expression.Variable(t, "castedVariable");
             var assignement = Expression.Assign(castedVariableExpr, xExprCasted);
 
-            foreach (var expr in BuildHashLambdas(t))
+            foreach (var expr in BuildHashLambdas(t, propertyFilter))
             {
                 var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(expr, castedVariableExpr));
                 var xx = Expression.Lambda<Func<object, IEnumerable<byte>>>(block, xExpr);
                 yield return xx;
             }
         }
-        private static IEnumerable<LambdaExpression> BuildHashLambdas(Type t)
+        private static IEnumerable<LambdaExpression> BuildHashLambdas(Type t, Func<System.Reflection.PropertyInfo, bool> propertyFilter)
         {
             var xInputParameter = Expression.Parameter(t, "input");
 
@@ -136,17 +166,17 @@ namespace Farmhash.Sharp
                 var block = Expression.Block(new ParameterExpression[] { castedVariableExpr }, assignement, Expression.Invoke(IConvertibleToBytesExpr, castedVariableExpr));
                 extractBytesExpr = Expression.Lambda(block, xInputParameter);
             }
-            else if (typeof(IDictionary).IsAssignableFrom(t))
+            else if (IsGenericIDict(t) || t.GetInterfaces().Any(IsGenericIDict))
             {
                 var pExprKeys = Expression.Property(xInputParameter, "Keys");
                 var pExprValues = Expression.Property(xInputParameter, "Values");
 
-                var subexprKeys = BuildHashLambdas(t.GetProperty("Keys").PropertyType);
+                var subexprKeys = BuildHashLambdas(t.GetProperty("Keys").PropertyType, propertyFilter);
                 foreach (var e in subexprKeys)
                 {
                     yield return Expression.Lambda(Expression.Invoke(e, pExprKeys), xInputParameter);
                 }
-                var subexprValues = BuildHashLambdas(t.GetProperty("Values").PropertyType);
+                var subexprValues = BuildHashLambdas(t.GetProperty("Values").PropertyType, propertyFilter);
                 foreach (var e in subexprValues)
                 {
                     yield return Expression.Lambda(Expression.Invoke(e, pExprValues), xInputParameter);
@@ -156,7 +186,7 @@ namespace Farmhash.Sharp
             else if (t.IsGenericType && typeof(IEnumerable).IsAssignableFrom(t.GetGenericTypeDefinition()))
             {
                 Type underlyingType = t.GetGenericArguments()[0];
-                var subexpr = BuildHashLambdas(underlyingType);
+                var subexpr = BuildHashLambdas(underlyingType, propertyFilter);
                 foreach (var e in subexpr)
                 {
                     var pBoxedUnderlyingObject = Expression.Parameter(typeof(object), "boxedUnderlyingObject");
@@ -175,11 +205,11 @@ namespace Farmhash.Sharp
             }
             else if (typeof(object).IsAssignableFrom(t))
             {
-                foreach (var pInfo in t.GetProperties())
+                foreach (var pInfo in t.GetProperties().Where(propertyFilter))
                 {
                     Expression pExpr = Expression.Property(xInputParameter, pInfo);
 
-                    var subexpr = BuildHashLambdas(pInfo.PropertyType);
+                    var subexpr = BuildHashLambdas(pInfo.PropertyType, propertyFilter);
                     foreach (var e in subexpr)
                     {
                         /*
@@ -201,6 +231,11 @@ namespace Farmhash.Sharp
                 throw new NotImplementedException($"type {t} is not supported");
             }
             yield return extractBytesExpr;
+        }
+
+        private static bool IsGenericIDict(Type t)
+        {
+            return t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IDictionary<,>);
         }
 
         private static Expression<Func<IEnumerable, IEnumerable<byte>>> GetIEnumerableToBytes(Func<object, IEnumerable<byte>> converter)
