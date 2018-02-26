@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>$author$</authors>
+    <owners>$author$</owners>
+    <licenseUrl>https://opensource.org/licenses/MIT</licenseUrl>
+    <projectUrl>https://github.com/andriniaina/Farmhash.Sharp.HashObject</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>High performance generic memberwise GetHashCode()</description>
+    <copyright>Copyright 2018 andriniaina</copyright>
+    <tags>GetHashCode FarmHash</tags>
+  </metadata>
+</package>
